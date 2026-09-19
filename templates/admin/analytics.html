@@ -1,0 +1,136 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-graph-up text-primary me-2"></i>Healthcare Analytics & Operational Insights</h2>
+            <p class="text-muted mb-0">Clinic performance indicators, queue trends, and department analytics</p>
+        </div>
+        <div>
+            <a href="/admin/dashboard" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back to Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="row g-4 mb-4">
+        <!-- 1. Daily Appointment Trend -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm p-4 h-100">
+                <h5 class="fw-bold mb-3"><i class="bi bi-calendar3 text-primary me-2"></i>Appointment Volume Trends</h5>
+                <div style="height: 320px;">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Department Share Doughnut -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm p-4 h-100">
+                <h5 class="fw-bold mb-3"><i class="bi bi-pie-chart text-primary me-2"></i>Department Distribution</h5>
+                <div style="height: 320px;">
+                    <canvas id="deptChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Waiting Times by Specialty -->
+        <div class="col-12">
+            <div class="card shadow-sm p-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Average Waiting Times by Specialty (Minutes)</h5>
+                <div style="height: 300px;">
+                    <canvas id="waitChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!API.requireAuth('admin')) return;
+
+    try {
+        const [trendRes, deptRes, waitRes] = await Promise.all([
+            API.get('/api/analytics/appointments?days=14'),
+            API.get('/api/analytics/departments'),
+            API.get('/api/analytics/waiting-times')
+        ]);
+
+        // 1. Trend Chart
+        const trends = trendRes.data || [];
+        new Chart(document.getElementById('trendChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: trends.map(t => t.date),
+                datasets: [
+                    {
+                        label: 'Total Booked',
+                        data: trends.map(t => t.total),
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Completed Visits',
+                        data: trends.map(t => t.completed),
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        // 2. Department Doughnut
+        const depts = deptRes.data || [];
+        new Chart(document.getElementById('deptChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: depts.map(d => d.department),
+                datasets: [{
+                    data: depts.map(d => d.count || 0),
+                    backgroundColor: ['#0d6efd', '#0dcaf0', '#198754', '#ffc107', '#6f42c1', '#fd7e14']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+
+        // 3. Waiting Times Bar Chart
+        const waits = waitRes.data || [];
+        new Chart(document.getElementById('waitChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: waits.map(w => w.specialization || `Doctor #${w.doctor_id}`),
+                datasets: [{
+                    label: 'Avg Waiting Time (Minutes)',
+                    data: waits.map(w => w.avg_wait_minutes),
+                    backgroundColor: '#0dcaf0'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+    } catch (err) {
+        console.error(err);
+    }
+});
+</script>
+{% endblock %}

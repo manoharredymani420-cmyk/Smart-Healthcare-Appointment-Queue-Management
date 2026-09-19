@@ -1,0 +1,126 @@
+:root {
+    --primary-color: #0d6efd;
+    --primary-dark: #0a58ca;
+    --primary-light: #e7f1ff;
+    --secondary-color: #0dcaf0;
+    --accent-color: #198754;
+    --accent-warning: #ffc107;
+    --accent-danger: #dc3545;
+    --dark-color: #1e293b;
+    --light-bg: #f8fafc;
+    --card-border: #e2e8f0;
+    --text-muted: #64748b;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    background-color: var(--light-bg);
+    color: var(--dark-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Navbar */
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+.navbar-brand span {
+    color: var(--secondary-color);
+}
+
+/* Cards & UI elements */
+.card {
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+}
+
+/* Metric KPI card */
+.stat-card {
+    border-left: 4px solid var(--primary-color);
+}
+.stat-card.stat-success {
+    border-left-color: var(--accent-color);
+}
+.stat-card.stat-warning {
+    border-left-color: var(--accent-warning);
+}
+.stat-card.stat-info {
+    border-left-color: var(--secondary-color);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--dark-color);
+}
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Digital Queue Ticket Card */
+.ticket-card {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+}
+.ticket-card::after {
+    content: '';
+    position: absolute;
+    right: -40px;
+    bottom: -40px;
+    width: 140px;
+    height: 140px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+}
+.token-display {
+    font-size: 3.2rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+/* Slot button */
+.slot-btn {
+    min-width: 85px;
+    font-weight: 600;
+    border-radius: 8px;
+    margin: 4px;
+    transition: all 0.15s ease-in-out;
+}
+.slot-btn.selected {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Badges */
+.badge-booked { background-color: #0dcaf0; color: #000; }
+.badge-waiting { background-color: #ffc107; color: #000; }
+.badge-in_progress { background-color: #0d6efd; color: #fff; }
+.badge-completed { background-color: #198754; color: #fff; }
+.badge-cancelled { background-color: #dc3545; color: #fff; }
+.badge-no_show { background-color: #6c757d; color: #fff; }
+
+/* Footer */
+footer {
+    margin-top: auto;
+    background: #ffffff;
+    border-top: 1px solid var(--card-border);
+    padding: 20px 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}

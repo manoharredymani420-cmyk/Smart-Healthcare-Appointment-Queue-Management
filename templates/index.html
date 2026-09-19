@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Hero Section -->
+    <div class="row align-items-center mb-5 py-4">
+        <div class="col-lg-7">
+            <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-semibold mb-3">
+                <i class="bi bi-cpu me-1"></i> AI & ML Powered Healthcare Operations
+            </span>
+            <h1 class="display-4 fw-bold text-dark mb-3">
+                Smart Healthcare Appointment & Digital Queue Platform
+            </h1>
+            <p class="lead text-muted mb-4">
+                Streamline outpatient clinic workflows, eliminate physical waiting crowds, and give patients real-time visibility with machine-learning-driven waiting time predictions.
+            </p>
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                <a href="/login" class="btn btn-primary btn-lg px-4"><i class="bi bi-box-arrow-in-right me-1"></i> Access Portal</a>
+                <a href="/register" class="btn btn-outline-secondary btn-lg px-4"><i class="bi bi-person-plus me-1"></i> Patient Registration</a>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card p-4 shadow-sm border-0 bg-white">
+                <h5 class="fw-bold text-dark mb-3"><i class="bi bi-lightning-charge-fill text-warning me-2"></i>Quick Demo Logins</h5>
+                <p class="text-muted small">Select any role below to prefill credentials and explore the platform:</p>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary text-start p-3" onclick="quickLogin('patient.alice@medicare.local', 'PatientPassword123!')">
+                        <div class="fw-bold"><i class="bi bi-person me-2"></i>Patient: Alice Johnson</div>
+                        <small class="text-muted">Book slots, track digital ticket & ML estimated wait time</small>
+                    </button>
+                    <button class="btn btn-outline-success text-start p-3" onclick="quickLogin('doctor.smith@medicare.local', 'DoctorPassword123!')">
+                        <div class="fw-bold"><i class="bi bi-heart-pulse me-2"></i>Doctor: Dr. John Smith</div>
+                        <small class="text-muted">Call next patient, view queue & add medical notes</small>
+                    </button>
+                    <button class="btn btn-outline-dark text-start p-3" onclick="quickLogin('admin@medicare.local', 'AdminPassword123!')">
+                        <div class="fw-bold"><i class="bi bi-shield-lock me-2"></i>Admin: Clinic Administrator</div>
+                        <small class="text-muted">View KPI analytics, manage doctors, departments & users</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Pillars -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="card h-100 p-4 card-hover">
+                <div class="text-primary fs-1 mb-3"><i class="bi bi-calendar2-range"></i></div>
+                <h5 class="fw-bold">Intelligent Booking</h5>
+                <p class="text-muted">Prevents double-booking and slot collisions. Automatically assigns daily sequential queue tokens.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 p-4 card-hover">
+                <div class="text-primary fs-1 mb-3"><i class="bi bi-robot"></i></div>
+                <h5 class="fw-bold">ML Waiting-Time Estimation</h5>
+                <p class="text-muted">Gradient Boosting model estimates patient wait time using historical patterns, queue length, and hour rush factors.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 p-4 card-hover">
+                <div class="text-primary fs-1 mb-3"><i class="bi bi-graph-up-arrow"></i></div>
+                <h5 class="fw-bold">Operational Analytics</h5>
+                <p class="text-muted">Interactive Chart.js visualizations for appointment volumes, specialty demand, and waiting time metrics.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function quickLogin(email, password) {
+    try {
+        const res = await API.post('/api/auth/login', { email, password });
+        if (res.success) {
+            API.setAuth(res.data.access_token, res.data.user);
+            API.redirectByRole(res.data.user.role);
+        }
+    } catch (err) {
+        alert("Login failed: " + err.message);
+    }
+}
+</script>
+{% endblock %}

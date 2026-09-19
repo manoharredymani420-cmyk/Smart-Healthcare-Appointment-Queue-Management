@@ -1,0 +1,139 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Clinic Operations Dashboard</h2>
+            <p class="text-muted mb-0">System health, daily appointments, queue load, and quick actions</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/admin/analytics" class="btn btn-primary"><i class="bi bi-graph-up me-1"></i> Full Analytics</a>
+        </div>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card p-3 stat-card">
+                <div class="stat-label">Total Appointments</div>
+                <div class="stat-value" id="kpi-total">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 stat-card stat-success">
+                <div class="stat-label">Completed Visits</div>
+                <div class="stat-value" id="kpi-completed">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 stat-card stat-warning">
+                <div class="stat-label">Active Queue Load</div>
+                <div class="stat-value" id="kpi-active-queue">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 stat-card stat-info">
+                <div class="stat-label">Avg Wait Time</div>
+                <div class="stat-value" id="kpi-avg-wait">0m</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Navigation Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card p-4 card-hover">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="text-primary fs-2 me-3"><i class="bi bi-person-badge"></i></div>
+                    <div>
+                        <h5 class="fw-bold mb-0">Doctor Management</h5>
+                        <small class="text-muted">Roster, schedules & capacity</small>
+                    </div>
+                </div>
+                <p class="text-muted small">Manage clinic physicians, assign departments, and adjust consultation time slots.</p>
+                <a href="/admin/doctors" class="btn btn-outline-primary btn-sm">Manage Doctors</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-4 card-hover">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="text-primary fs-2 me-3"><i class="bi bi-building"></i></div>
+                    <div>
+                        <h5 class="fw-bold mb-0">Departments</h5>
+                        <small class="text-muted">Specialties and divisions</small>
+                    </div>
+                </div>
+                <p class="text-muted small">Configure clinical departments such as Cardiology, Pediatrics, and Dermatology.</p>
+                <a href="/admin/departments" class="btn btn-outline-primary btn-sm">Manage Departments</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-4 card-hover">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="text-primary fs-2 me-3"><i class="bi bi-people"></i></div>
+                    <div>
+                        <h5 class="fw-bold mb-0">User Directory</h5>
+                        <small class="text-muted">Patients, doctors & staff</small>
+                    </div>
+                </div>
+                <p class="text-muted small">Review registered users, view roles, and activate or deactivate accounts.</p>
+                <a href="/admin/users" class="btn btn-outline-primary btn-sm">Manage Users</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mini Chart Preview -->
+    <div class="card shadow-sm p-4">
+        <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart-line text-primary me-2"></i>Recent Appointment Volume</h5>
+        <div style="height: 250px;">
+            <canvas id="miniVolumeChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!API.requireAuth('admin')) return;
+
+    try {
+        const [overviewRes, trendsRes] = await Promise.all([
+            API.get('/api/analytics/overview'),
+            API.get('/api/analytics/appointments?days=7')
+        ]);
+
+        const o = overviewRes.data || {};
+        document.getElementById('kpi-total').innerText = o.total_appointments || 0;
+        document.getElementById('kpi-completed').innerText = o.completed_appointments || 0;
+        document.getElementById('kpi-active-queue').innerText = o.active_in_queue || 0;
+        document.getElementById('kpi-avg-wait').innerText = `${o.average_wait_minutes || 0}m`;
+
+        // Render mini volume chart
+        const trends = trendsRes.data || [];
+        const ctx = document.getElementById('miniVolumeChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: trends.map(t => t.date),
+                datasets: [
+                    { label: 'Completed Visits', data: trends.map(t => t.completed), backgroundColor: '#198754' },
+                    { label: 'Total Bookings', data: trends.map(t => t.total), backgroundColor: '#0d6efd' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                }
+            }
+        });
+
+    } catch (err) {
+        console.error(err);
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,237 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-people text-primary me-2"></i>Live Queue Manager</h3>
+            <p class="text-muted mb-0">Call patients, advance queue tickets, and record consultation notes</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-success fw-bold px-4" id="call-next-btn" onclick="callNextPatient()">
+                <i class="bi bi-megaphone me-1"></i> Call Next Patient
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Consultation Box -->
+    <div class="card p-4 shadow-sm mb-4 border-2 border-primary bg-primary-subtle">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-hospital text-primary me-2"></i>Current Patient in Room</h5>
+            <span class="badge bg-primary fs-6 px-3 py-1" id="active-queue-badge">STANDBY</span>
+        </div>
+        <div id="active-consultation-details">
+            <p class="text-muted mb-0">No patient is currently called. Click <strong>"Call Next Patient"</strong> to begin consultation.</p>
+        </div>
+    </div>
+
+    <!-- Waiting Queue Table -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0">Today's Patient Queue Line</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Pos</th>
+                            <th>Token</th>
+                            <th>Patient Name</th>
+                            <th>Scheduled Time</th>
+                            <th>Status</th>
+                            <th>Estimated Wait</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="doctor-queue-tbody">
+                        <tr><td colspan="7" class="text-center py-4 text-muted">Loading queue roster...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Complete Consultation & Add Notes -->
+<div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Consultation Notes & Medical Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal-appt-id">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Diagnosis / Clinical Demo Label</label>
+                    <input type="text" id="modal-diagnosis" class="form-control" placeholder="e.g. Acute Pharyngitis, Routine Physical">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Consultation Notes & Guidance</label>
+                    <textarea id="modal-notes" class="form-control" rows="3" placeholder="Observation, prescribed medications, recommended care..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Follow-Up Date (Optional)</label>
+                    <input type="date" id="modal-follow-up" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitMedicalNotes()">Save & Complete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentAppointment = null;
+let notesModalInstance = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!API.requireAuth('doctor')) return;
+    notesModalInstance = new bootstrap.Modal(document.getElementById('notesModal'));
+    loadLiveQueue();
+    setInterval(loadLiveQueue, 15000);
+});
+
+async function loadLiveQueue() {
+    const user = API.getUser();
+    const docId = user.doctor_id || 1;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tbody = document.getElementById('doctor-queue-tbody');
+
+    try {
+        const res = await API.get(`/api/doctors/${docId}/queue?date=${todayStr}`);
+        const data = res.data || {};
+        const list = data.queue || [];
+        currentAppointment = data.current_patient;
+
+        // Render Active Consultation Panel
+        const activePanel = document.getElementById('active-consultation-details');
+        const activeBadge = document.getElementById('active-queue-badge');
+
+        if (currentAppointment) {
+            activeBadge.innerText = currentAppointment.queue_status || 'IN_PROGRESS';
+            activeBadge.className = 'badge bg-success fs-6 px-3 py-1';
+            activePanel.innerHTML = `
+                <div class="d-flex flex-wrap justify-content-between align-items-center">
+                    <div>
+                        <h4 class="fw-bold mb-1">${currentAppointment.patient_name || 'Patient'}</h4>
+                        <div class="text-dark">Token: <strong class="text-primary fs-5">${currentAppointment.token_number}</strong> | Scheduled: ${currentAppointment.appointment_time}</div>
+                        <div class="small text-muted mt-1">Reason: ${currentAppointment.reason || 'None specified'}</div>
+                    </div>
+                    <div class="d-flex gap-2 mt-3 mt-md-0">
+                        <button class="btn btn-primary" onclick="openNotesModal(${currentAppointment.id})">
+                            <i class="bi bi-check2-circle me-1"></i> Complete & Add Notes
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="markNoShow(${currentAppointment.id})">
+                            <i class="bi bi-x-circle me-1"></i> No-Show
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            activeBadge.innerText = 'STANDBY';
+            activeBadge.className = 'badge bg-secondary fs-6 px-3 py-1';
+            activePanel.innerHTML = '<p class="text-muted mb-0">No patient is currently in the room. Click <strong>"Call Next Patient"</strong> to proceed.</p>';
+        }
+
+        // Render Queue Table
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No appointments in queue for today.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(a => `
+            <tr class="${a.queue_status === 'CALLED' || a.queue_status === 'IN_PROGRESS' ? 'table-primary' : ''}">
+                <td class="fw-bold">#${a.queue_position || '-'}</td>
+                <td class="fw-bold text-primary">${a.token_number}</td>
+                <td class="fw-semibold">${a.patient_name || 'Patient'}</td>
+                <td>${a.appointment_time}</td>
+                <td><span class="badge badge-${a.status.toLowerCase()}">${a.status}</span></td>
+                <td>${a.status === 'WAITING' ? `${a.estimated_wait_minutes || 0} mins (${a.patients_ahead || 0} ahead)` : '--'}</td>
+                <td>
+                    ${a.queue_status === 'WAITING' ? `
+                        <button class="btn btn-sm btn-outline-primary" onclick="prioritizePatient(${a.id})">Prioritize</button>
+                    ` : a.queue_status === 'CALLED' ? `
+                        <button class="btn btn-sm btn-success" onclick="openNotesModal(${a.id})">Complete</button>
+                    ` : `
+                        <span class="text-muted small">${a.queue_status}</span>
+                    `}
+                </td>
+            </tr>
+        `).join('');
+
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${err.message}</td></tr>`;
+    }
+}
+
+async function callNextPatient() {
+    const user = API.getUser();
+    const docId = user.doctor_id || 1;
+    const btn = document.getElementById('call-next-btn');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Calling...';
+
+    try {
+        const res = await API.post(`/api/queue/doctor/${docId}/next`);
+        if (res.data) {
+            alert(`Now Calling Token: ${res.data.token_number} (${res.data.patient_name})`);
+        } else {
+            alert(res.message || "No more waiting patients in queue.");
+        }
+        loadLiveQueue();
+    } catch (err) {
+        alert("Error calling next patient: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-megaphone me-1"></i> Call Next Patient';
+    }
+}
+
+function openNotesModal(apptId) {
+    document.getElementById('modal-appt-id').value = apptId;
+    document.getElementById('modal-diagnosis').value = '';
+    document.getElementById('modal-notes').value = '';
+    document.getElementById('modal-follow-up').value = '';
+    notesModalInstance.show();
+}
+
+async function submitMedicalNotes() {
+    const appointment_id = parseInt(document.getElementById('modal-appt-id').value);
+    const diagnosis_demo = document.getElementById('modal-diagnosis').value.trim();
+    const notes = document.getElementById('modal-notes').value.trim();
+    const follow_up_date = document.getElementById('modal-follow-up').value;
+
+    try {
+        await API.post('/api/records', {
+            appointment_id,
+            diagnosis_demo,
+            notes,
+            follow_up_date: follow_up_date || null
+        });
+
+        alert("Consultation record saved successfully!");
+        notesModalInstance.hide();
+        loadLiveQueue();
+    } catch (err) {
+        alert("Failed to save record: " + err.message);
+    }
+}
+
+async function markNoShow(apptId) {
+    if (!confirm("Mark this patient as NO-SHOW / Skipped?")) return;
+    try {
+        await API.put(`/api/queue/${apptId}/status`, { status: 'SKIPPED' });
+        loadLiveQueue();
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
+}
+</script>
+{% endblock %}

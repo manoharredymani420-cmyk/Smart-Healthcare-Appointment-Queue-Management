@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-calendar-check text-primary me-2"></i>My Appointments</h3>
+            <p class="text-muted mb-0">Review past, present, and upcoming patient bookings</p>
+        </div>
+        <div class="d-flex gap-2">
+            <input type="date" id="filter-date" class="form-control form-control-sm">
+            <button class="btn btn-outline-primary btn-sm" onclick="loadDoctorAppointments()">Filter</button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Token</th>
+                            <th>Patient Name & Phone</th>
+                            <th>Date & Time</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody id="doc-appts-tbody">
+                        <tr><td colspan="5" class="text-center py-4 text-muted">Loading appointments...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    if (!API.requireAuth('doctor')) return;
+    loadDoctorAppointments();
+});
+
+async function loadDoctorAppointments() {
+    const user = API.getUser();
+    const docId = user.doctor_id || 1;
+    const filterDate = document.getElementById('filter-date').value;
+    const tbody = document.getElementById('doc-appts-tbody');
+
+    let url = `/api/doctors/${docId}/appointments`;
+    if (filterDate) url += `?date=${filterDate}`;
+
+    try {
+        const res = await API.get(url);
+        const list = res.data || [];
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No appointments found matching selection.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(a => `
+            <tr>
+                <td class="fw-bold text-primary">${a.token_number}</td>
+                <td>
+                    <div class="fw-semibold">${a.patient_name || 'Patient'}</div>
+                    <small class="text-muted">${a.patient_phone || 'N/A'}</small>
+                </td>
+                <td>
+                    <div>${a.appointment_date}</div>
+                    <small class="text-muted">${a.appointment_time}</small>
+                </td>
+                <td><span class="badge badge-${a.status.toLowerCase()}">${a.status}</span></td>
+                <td><small class="text-muted">${a.reason || 'None'}</small></td>
+            </tr>
+        `).join('');
+
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">${err.message}</td></tr>`;
+    }
+}
+</script>
+{% endblock %}

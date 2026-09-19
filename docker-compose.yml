@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: medicare_web
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=medicare-super-secret-key-change-in-production
+      - JWT_SECRET_KEY=medicare-jwt-secret-production-grade-token-key-2026
+      - DATABASE_URL=postgresql://medicare_user:medicare_pass@db:5432/medicare_db
+      - HOST=0.0.0.0
+      - PORT=5000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: medicare_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: medicare_user
+      POSTGRES_PASSWORD: medicare_pass
+      POSTGRES_DB: medicare_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicare_user -d medicare_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

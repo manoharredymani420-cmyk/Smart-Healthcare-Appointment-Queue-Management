@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card p-4 shadow-sm">
+                <div class="text-center mb-4">
+                    <h3 class="fw-bold text-dark"><i class="bi bi-person-plus text-primary me-2"></i>Patient Registration</h3>
+                    <p class="text-muted">Create your patient profile to book appointments and track queue status</p>
+                </div>
+
+                <div id="register-alert"></div>
+
+                <form id="register-form">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Full Name</label>
+                        <input type="text" id="name" class="form-control" placeholder="e.g. John Doe" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Email Address</label>
+                        <input type="email" id="email" class="form-control" placeholder="john@example.com" required>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Password</label>
+                            <input type="password" id="password" class="form-control" placeholder="Create password" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Phone Number</label>
+                            <input type="text" id="phone" class="form-control" placeholder="+1-555-0199">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Gender</label>
+                            <select id="gender" class="form-select">
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Date of Birth</label>
+                            <input type="date" id="dob" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Residential Address</label>
+                        <textarea id="address" class="form-control" rows="2" placeholder="Street address, City"></textarea>
+                    </div>
+
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary py-2 fw-semibold" id="reg-btn">Create Account</button>
+                    </div>
+                </form>
+
+                <div class="text-center">
+                    <span class="text-muted">Already registered?</span> <a href="/login" class="text-primary fw-semibold">Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const phone = document.getElementById('phone').value.trim();
+    const gender = document.getElementById('gender').value;
+    const date_of_birth = document.getElementById('dob').value;
+    const address = document.getElementById('address').value.trim();
+    const btn = document.getElementById('reg-btn');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Creating profile...';
+
+    try {
+        const res = await API.post('/api/auth/register', {
+            name, email, password, role: 'patient', phone, gender, date_of_birth, address
+        });
+        if (res.success) {
+            API.setAuth(res.data.access_token, res.data.user);
+            window.location.href = '/patient/dashboard';
+        }
+    } catch (err) {
+        API.showAlert('register-alert', err.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = 'Create Account';
+    }
+});
+</script>
+{% endblock %}

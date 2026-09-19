@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card p-4 shadow-sm">
+                <div class="text-center mb-4">
+                    <h3 class="fw-bold text-dark"><i class="bi bi-box-arrow-in-right text-primary me-2"></i>Sign In</h3>
+                    <p class="text-muted">Enter your credentials to access your MediCare portal</p>
+                </div>
+
+                <div id="login-alert"></div>
+
+                <form id="login-form">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Email Address</label>
+                        <input type="email" id="email" class="form-control" placeholder="name@example.com" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Password</label>
+                        <input type="password" id="password" class="form-control" placeholder="Enter your password" required>
+                    </div>
+
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary py-2 fw-semibold" id="login-btn">Sign In</button>
+                    </div>
+                </form>
+
+                <div class="text-center mb-3">
+                    <span class="text-muted">Don't have an account?</span> <a href="/register" class="text-primary fw-semibold">Register as Patient</a>
+                </div>
+
+                <hr>
+                <div class="small">
+                    <p class="fw-bold mb-2 text-secondary"><i class="bi bi-person-badge me-1"></i>Quick Fill Demo Credentials:</p>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="fillCreds('patient.alice@medicare.local', 'PatientPassword123!')">Patient</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="fillCreds('doctor.smith@medicare.local', 'DoctorPassword123!')">Doctor</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="fillCreds('admin@medicare.local', 'AdminPassword123!')">Admin</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fillCreds(e, p) {
+    document.getElementById('email').value = e;
+    document.getElementById('password').value = p;
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('login-btn');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Signing in...';
+
+    try {
+        const res = await API.post('/api/auth/login', { email, password });
+        if (res.success) {
+            API.setAuth(res.data.access_token, res.data.user);
+            API.redirectByRole(res.data.user.role);
+        }
+    } catch (err) {
+        API.showAlert('login-alert', err.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+    }
+});
+</script>
+{% endblock %}

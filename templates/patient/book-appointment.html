@@ -1,0 +1,230 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow-sm">
+                <div class="mb-4">
+                    <h3 class="fw-bold text-dark"><i class="bi bi-calendar-plus text-primary me-2"></i>Book Doctor Appointment</h3>
+                    <p class="text-muted">Choose your department, doctor, and convenient time slot</p>
+                </div>
+
+                <div id="booking-alert"></div>
+
+                <form id="booking-form">
+                    <!-- 1. Department -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">1. Select Medical Department</label>
+                        <select id="department-select" class="form-select" required>
+                            <option value="">-- Choose Department --</option>
+                        </select>
+                    </div>
+
+                    <!-- 2. Doctor -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">2. Select Doctor</label>
+                        <select id="doctor-select" class="form-select" disabled required>
+                            <option value="">-- Select Department First --</option>
+                        </select>
+                        <div id="doctor-info" class="small text-muted mt-1"></div>
+                    </div>
+
+                    <!-- 3. Appointment Date -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">3. Select Date</label>
+                        <input type="date" id="appointment-date" class="form-control" disabled required>
+                    </div>
+
+                    <!-- 4. Available Slots -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">4. Available Time Slots</label>
+                        <div id="slots-container" class="border rounded p-3 bg-light text-center">
+                            <span class="text-muted">Select a doctor and date above to load available slots</span>
+                        </div>
+                        <input type="hidden" id="selected-slot" required>
+                    </div>
+
+                    <!-- 5. Reason for Visit -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">5. Reason / Symptoms</label>
+                        <textarea id="reason" class="form-control" rows="2" placeholder="Briefly describe your symptoms or reason for visit (optional)"></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary py-2 fw-semibold" id="book-btn" disabled>
+                            Confirm Appointment & Generate Token
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let doctorsList = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!API.requireAuth('patient')) return;
+
+    // Set min date to today
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('appointment-date');
+    dateInput.min = today;
+    dateInput.value = today;
+
+    // Load departments
+    try {
+        const res = await API.get('/api/departments');
+        const deptSelect = document.getElementById('department-select');
+        (res.data || []).forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.id;
+            opt.innerText = d.name;
+            deptSelect.appendChild(opt);
+        });
+    } catch (e) {
+        console.error(e);
+    }
+});
+
+// When Department changes
+document.getElementById('department-select').addEventListener('change', async (e) => {
+    const deptId = e.target.value;
+    const docSelect = document.getElementById('doctor-select');
+    const dateInput = document.getElementById('appointment-date');
+    const slotsDiv = document.getElementById('slots-container');
+
+    docSelect.innerHTML = '<option value="">-- Choose Doctor --</option>';
+    docSelect.disabled = true;
+    dateInput.disabled = true;
+    slotsDiv.innerHTML = '<span class="text-muted">Select a doctor and date to load slots</span>';
+    document.getElementById('selected-slot').value = '';
+    document.getElementById('book-btn').disabled = true;
+
+    if (!deptId) return;
+
+    try {
+        const res = await API.get(`/api/doctors?department_id=${deptId}`);
+        doctorsList = res.data || [];
+        if (doctorsList.length === 0) {
+            docSelect.innerHTML = '<option value="">No doctors available in this department</option>';
+            return;
+        }
+
+        doctorsList.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.id;
+            opt.innerText = `${d.name} (${d.specialization})`;
+            docSelect.appendChild(opt);
+        });
+        docSelect.disabled = false;
+    } catch (err) {
+        console.error(err);
+    }
+});
+
+// When Doctor changes
+document.getElementById('doctor-select').addEventListener('change', (e) => {
+    const docId = e.target.value;
+    const dateInput = document.getElementById('appointment-date');
+    const docInfo = document.getElementById('doctor-info');
+
+    if (docId) {
+        const doc = doctorsList.find(d => d.id == docId);
+        if (doc) {
+            docInfo.innerHTML = `<strong>Specialization:</strong> ${doc.specialization} | <strong>Experience:</strong> ${doc.experience_years} years | <strong>Duration:</strong> ${doc.consultation_duration_minutes} mins/patient`;
+        }
+        dateInput.disabled = false;
+        loadAvailableSlots();
+    } else {
+        docInfo.innerHTML = '';
+        dateInput.disabled = true;
+    }
+});
+
+// When Date changes
+document.getElementById('appointment-date').addEventListener('change', () => {
+    loadAvailableSlots();
+});
+
+async function loadAvailableSlots() {
+    const docId = document.getElementById('doctor-select').value;
+    const date = document.getElementById('appointment-date').value;
+    const slotsDiv = document.getElementById('slots-container');
+    const bookBtn = document.getElementById('book-btn');
+
+    document.getElementById('selected-slot').value = '';
+    bookBtn.disabled = true;
+
+    if (!docId || !date) return;
+
+    slotsDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Checking doctor schedule...';
+
+    try {
+        const res = await API.get(`/api/doctors/${docId}/availability?date=${date}`);
+        const slots = (res.data && res.data.available_slots) || [];
+
+        if (slots.length === 0) {
+            slotsDiv.innerHTML = '<span class="text-danger fw-semibold"><i class="bi bi-exclamation-circle me-1"></i> No available slots for this date. The doctor may not be scheduled or all slots are booked.</span>';
+            return;
+        }
+
+        slotsDiv.innerHTML = `
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+                ${slots.map(s => `<button type="button" class="btn btn-outline-primary slot-btn" onclick="selectSlot('${s}', this)">${s}</button>`).join('')}
+            </div>
+        `;
+    } catch (err) {
+        slotsDiv.innerHTML = `<span class="text-danger">Failed to load slots: ${err.message}</span>`;
+    }
+}
+
+function selectSlot(timeStr, btnEl) {
+    document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected', 'btn-primary'));
+    btnEl.classList.add('selected', 'btn-primary');
+    document.getElementById('selected-slot').value = timeStr;
+    document.getElementById('book-btn').disabled = false;
+}
+
+// Handle booking submit
+document.getElementById('booking-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const doctor_id = document.getElementById('doctor-select').value;
+    const appointment_date = document.getElementById('appointment-date').value;
+    const appointment_time = document.getElementById('selected-slot').value;
+    const reason = document.getElementById('reason').value.trim();
+    const btn = document.getElementById('book-btn');
+
+    if (!appointment_time) {
+        alert("Please click and select an available time slot!");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Reserving slot...';
+
+    try {
+        const res = await API.post('/api/appointments', {
+            doctor_id: parseInt(doctor_id),
+            appointment_date,
+            appointment_time,
+            reason
+        });
+
+        if (res.success) {
+            alert(`Appointment successfully booked!\nYour Queue Token Number is: ${res.data.token_number}`);
+            window.location.href = '/patient/queue';
+        }
+    } catch (err) {
+        API.showAlert('booking-alert', err.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = 'Confirm Appointment & Generate Token';
+    }
+});
+</script>
+{% endblock %}

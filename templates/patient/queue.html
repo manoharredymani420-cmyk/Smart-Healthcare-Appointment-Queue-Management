@@ -1,0 +1,139 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="mb-4">
+        <h3 class="fw-bold mb-1"><i class="bi bi-ticket-perforated text-primary me-2"></i>Live Digital Queue Tracker</h3>
+        <p class="text-muted mb-0">Real-time queue ticket status and ML-predicted consultation wait time</p>
+    </div>
+
+    <!-- Active Ticket Container -->
+    <div id="ticket-view">
+        <div class="card p-5 text-center shadow-sm">
+            <div class="spinner-border text-primary mx-auto mb-3" role="status"></div>
+            <p class="text-muted mb-0">Checking your active queue ticket...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!API.requireAuth('patient')) return;
+    loadQueueTicket();
+    // Auto-refresh queue every 15 seconds
+    setInterval(loadQueueTicket, 15000);
+});
+
+async function loadQueueTicket() {
+    const container = document.getElementById('ticket-view');
+    try {
+        const apptsRes = await API.get('/api/patients/me/appointments');
+        const list = apptsRes.data || [];
+        
+        // Find active appointment
+        const todayStr = new Date().toISOString().split('T')[0];
+        const activeAppt = list.find(a => ['BOOKED', 'CONFIRMED', 'WAITING', 'IN_PROGRESS'].includes(a.status));
+
+        if (!activeAppt) {
+            container.innerHTML = `
+                <div class="card p-5 text-center shadow-sm">
+                    <div class="fs-1 text-muted mb-3"><i class="bi bi-ticket"></i></div>
+                    <h4 class="fw-bold text-dark">No Active Queue Ticket</h4>
+                    <p class="text-muted mb-4">You do not currently have any pending appointments in the clinic queue.</p>
+                    <div><a href="/patient/book-appointment" class="btn btn-primary px-4"><i class="bi bi-calendar-plus me-1"></i> Book New Appointment</a></div>
+                </div>
+            `;
+            return;
+        }
+
+        // Fetch ML prediction details
+        let mlDetails = null;
+        try {
+            const predRes = await API.get(`/api/predictions/${activeAppt.id}`);
+            if (predRes.success) mlDetails = predRes.data;
+        } catch (e) {
+            console.log('Prediction log lookup error:', e);
+        }
+
+        const isCalled = activeAppt.queue_status === 'CALLED' || activeAppt.status === 'IN_PROGRESS';
+
+        container.innerHTML = `
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <!-- Ticket Main Card -->
+                    <div class="ticket-card shadow-lg mb-4 ${isCalled ? 'bg-success' : ''}">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <span class="badge ${isCalled ? 'bg-warning text-dark' : 'bg-light text-primary'} px-3 py-2 fs-6 fw-bold">
+                                    ${isCalled ? '🔔 YOU ARE BEING CALLED!' : 'IN CLINIC QUEUE'}
+                                </span>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-white-50 small">Appointment Date</span>
+                                <div class="fw-bold">${activeAppt.appointment_date}</div>
+                            </div>
+                        </div>
+
+                        <div class="text-center my-4">
+                            <div class="text-white-50 text-uppercase tracking-wider small fw-semibold">Your Token Number</div>
+                            <div class="token-display my-1">${activeAppt.token_number}</div>
+                            <div class="badge bg-white text-dark px-3 py-1 rounded-pill mt-1">Scheduled Time: ${activeAppt.appointment_time}</div>
+                        </div>
+
+                        <div class="row g-2 text-center pt-3 border-top border-white-50">
+                            <div class="col-4">
+                                <div class="text-white-50 small">Queue Position</div>
+                                <div class="fs-4 fw-bold">#${activeAppt.queue_position || 1}</div>
+                            </div>
+                            <div class="col-4 border-start border-end border-white-50">
+                                <div class="text-white-50 small">Patients Ahead</div>
+                                <div class="fs-4 fw-bold">${activeAppt.patients_ahead || 0}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-white-50 small">Estimated Wait</div>
+                                <div class="fs-4 fw-bold">${isCalled ? '0 mins' : `${activeAppt.estimated_wait_minutes || 0} mins`}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Details & Prediction Metadata -->
+                    <div class="card shadow-sm p-4">
+                        <h5 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>Consultation & Queue Details</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="text-muted small">Assigned Physician</div>
+                                <div class="fw-bold">${activeAppt.doctor_name || 'Dr. Specialist'}</div>
+                                <div class="text-muted small">${activeAppt.department_name || 'Medical Department'}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted small">Current Queue Status</div>
+                                <div><span class="badge badge-${activeAppt.status.toLowerCase()} fs-6">${activeAppt.status}</span></div>
+                            </div>
+                            <div class="col-12 border-top pt-3">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <span class="fw-bold text-dark"><i class="bi bi-cpu text-primary me-1"></i>ML Model Wait Estimation:</span>
+                                        <span class="text-muted small ms-1">Gradient Boosting Regressor (v1.0)</span>
+                                    </div>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1">
+                                        ~ ${activeAppt.estimated_wait_minutes || 0} Minutes
+                                    </span>
+                                </div>
+                                <p class="text-muted small mt-2 mb-0">
+                                    Estimation algorithm dynamically weighs current queue depth, consultation duration, physician throughput, and time-of-day traffic patterns.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+</script>
+{% endblock %}
